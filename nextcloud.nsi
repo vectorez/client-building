@@ -40,7 +40,9 @@
 !define SQLITE_DLL_PATH "${QT_PATH}/plugins/sqldrivers"
 !define IMAGEFORMATS_DLL_PATH "${QT_PATH}/plugins/imageformats"
 !define PLATFORMS_DLL_PATH "${QT_PATH}/plugins/platforms"
-!define PROJECT_PATH "$%PROJECT_PATH%"
+!define PROJECT_PATH "$%VIRTUAL_DRIVE%"
+!define DOKAN_PATH "$SYSDIR\drivers\dokan1.sys"
+!define DOKAN_INSTALLER_PATH "${PROJECT_PATH}\dokan"
 !define BUILD_PATH "${PROJECT_PATH}\desktop\build"
 !define LIBS_PATH "${PROJECT_PATH}\libs"
 !define INSTALL_PATH "${PROJECT_PATH}\install"
@@ -300,14 +302,42 @@ Function EnsureOwncloudShutdown
    !insertmacro CheckAndConfirmEndProcess "${APPLICATION_EXECUTABLE}"
 FunctionEnd
 
+Function InstallDokan
+   DetailPrint "Attempting to install Dokan drive 1.1.0."
+   ExecWait '"msiexec" /i "$OUTDIR\Dokan_x64.msi'
+   Delete "$OUTDIR\Dokan_x64.msi"
+FunctionEnd
+
+Function DokanDriveInstall
+   ${DisableX64FSRedirection}
+      DetailPrint "Checking for Dokan drive 1.1.0 installation."
+      IfFileExists ${DOKAN_PATH} found notfound
+      found:
+      	MessageBox MB_ABORTRETRYIGNORE|MB_ICONQUESTION|MB_TOPMOST "The Nextcloud Virtual Drive requires Dokany 1.1.0 (Dokan drive). If you have another version, you need to abort this proccess, uninstall Dokany and restart your computer before continuing the installation." IDIGNORE ignore IDRETRY retry 
+        Quit
+
+      notfound:
+      	MessageBox MB_OK|mb_ICONEXCLAMATION|MB_TOPMOST "The Nextcloud Virtual Drive requires Dokany 1.1.0 (Dokan drive). Its installer will be executed now."
+	Call InstallDokan
+
+      retry: 
+        Call InstallDokan	
+
+      ignore:
+	DetailPrint "Ignoring installation of Dokan drive 1.1.0."	
+
+   ${EnableX64FSRedirection}
+FunctionEnd
+
 Function InstallRedistributables
    ${If} ${RunningX64}
-      ExecWait '"$OUTDIR\vcredist_x64.exe" /install /quiet'
+      ExecWait '"$OUTDIR\vcredist_x64.exe" /install /quiet /norestart'
    ${Else}
-      ExecWait '"$OUTDIR\vcredist_x86.exe" /install /quiet'
+      ExecWait '"$OUTDIR\vcredist_x86.exe" /install /quiet /norestart'
    ${EndIf}
    Delete "$OUTDIR\vcredist_x86.exe"
    Delete "$OUTDIR\vcredist_x64.exe"
+   Call DokanDriveInstall
 FunctionEnd
 
 ##############################################################################
@@ -441,6 +471,7 @@ SectionEnd
       DetailPrint $OPTION_SECTION_SC_SHELL_EXT_DetailPrint
       File "${VCREDISTPATH}\vcredist_x86.exe"
       File "${VCREDISTPATH}\vcredist_x64.exe"
+      File "${DOKAN_INSTALLER_PATH}\Dokan_x64.msi"
       Call InstallRedistributables
       CreateDirectory "$INSTDIR\shellext"
       !define LIBRARY_COM
@@ -448,14 +479,14 @@ SectionEnd
       !define LIBRARY_IGNORE_VERSION
       ${If} ${RunningX64}
          !define LIBRARY_X64
-         !insertmacro InstallLib DLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\x64\OCUtil_x64.dll" "$INSTDIR\shellext\OCUtil_x64.dll" "$INSTDIR\shellext"
-         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\x64\OCOverlays_x64.dll" "$INSTDIR\shellext\OCOverlays_x64.dll" "$INSTDIR\shellext"
-         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\x64\OCContextMenu_x64.dll" "$INSTDIR\shellext\OCContextMenu_x64.dll" "$INSTDIR\shellext"
+         !insertmacro InstallLib DLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\x64\OCUtil_x64.dll" "$INSTDIR\shellext\OCUtil_x64.dll" "$INSTDIR"
+         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\x64\OCOverlays_x64.dll" "$INSTDIR\shellext\OCOverlays_x64.dll" "$INSTDIR"
+         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\x64\OCContextMenu_x64.dll" "$INSTDIR\shellext\OCContextMenu_x64.dll" "$INSTDIR"
          !undef LIBRARY_X64
      ${Else}
-         !insertmacro InstallLib DLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\Win32\OCUtil_x86.dll" "$INSTDIR\shellext\OCUtil_x86.dll" "$INSTDIR\shellext"
-         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\Win32\OCOverlays_x86.dll" "$INSTDIR\shellext\OCOverlays_x86.dll" "$INSTDIR\shellext"
-         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\Win32\OCContextMenu_x86.dll" "$INSTDIR\shellext\OCContextMenu_x86.dll" "$INSTDIR\shellext"
+         !insertmacro InstallLib DLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\Win32\OCUtil_x86.dll" "$INSTDIR\shellext\OCUtil_x86.dll" "$INSTDIR"
+         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\Win32\OCOverlays_x86.dll" "$INSTDIR\shellext\OCOverlays_x86.dll" "$INSTDIR"
+         !insertmacro InstallLib REGDLL NOTSHARED REBOOT_PROTECTED "${SOURCE_PATH}\binary\shell_integration\windows\Release\Win32\OCContextMenu_x86.dll" "$INSTDIR\shellext\OCContextMenu_x86.dll" "$INSTDIR"
       ${Endif}
       !undef LIBRARY_COM
       !undef LIBRARY_SHELL_EXTENSION
